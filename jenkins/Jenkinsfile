@@ -17,15 +17,13 @@ pipeline {
 
         stage('Test Backend') {
             steps {
-                dir('backend') {
-                    sh '''
-                        python3 -m venv venv
-                        . venv/Scripts/activate
-                        pip install -r requirements.txt
-                        pip install pytest httpx
-                        pytest tests/ -v || echo 'No tests found'
-                    '''
-                }
+                sh '''
+                    docker run --rm \
+                        -v $(pwd)/backend:/app \
+                        -w /app \
+                        python:3.11-slim \
+                        sh -c "pip install -r requirements.txt pytest httpx && pytest tests/ -v"
+                '''
             }
         }
 
