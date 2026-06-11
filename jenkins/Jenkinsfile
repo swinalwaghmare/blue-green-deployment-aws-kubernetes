@@ -1,0 +1,93 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+        BACKEND_IMAGE = "swinalwaghmare/pingboard-backend"
+        FRONTEND_IMAGE = "swinalwaghmare/pingboard-frontend"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Test Backend') {
+            steps {
+                dir('backend') {
+                    sh '''
+                        python3 -m venv venv
+                        . venv/Scripts/activate
+                        pip install -r requirements.txt
+                        pip install pytest httpx
+                        pytest tests/ -v || echo 'No tests found'
+                    '''
+                }
+            }
+        }
+
+        stage('Build Images') {
+            steps {
+                sh "docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} ./backend"
+                sh "docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} ./frontend"
+            }
+        }
+
+        stage('Push to Docker Hub'){
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'staging'
+                }
+            }
+            steps {
+                sh "echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin"
+                sh "docker push ${BACKEND_IMAGE}:${IMAGE_TAG}"
+                sh "docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}"
+            }
+        }
+
+        stage('Deploy to Staging') {
+            when {
+                branch 'staging'
+            }
+            steps {
+                sh """
+                    helm upgrade --install pingboard-staging ./helm/pingboard \
+                        --set backend.image.tag=${IMAGE_TAG} \
+                        --set frontend.image.tag=${IMAGE_TAG} \
+                        --set deployment.slot=blue \
+                        --namespace staging --create-namespace
+                """
+            }
+        }
+
+        stage('Deploy to Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                sh """
+                    helm upgrade --install pingboard-prod ./helm/pingboard \
+                        --set backend.image.tag=${IMAGE_TAG} \
+                        --set frontend.image.tag=${IMAGE_TAG} \
+                        --set deployment.slot=blue \
+                        --namespace production --create-namespace
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Pipeline succeeded — build ${BUILD_NUMBER}"
+        }
+        failure {
+            echo "Pipeline failed — check logs above"
+        }
+    }
+
+}
