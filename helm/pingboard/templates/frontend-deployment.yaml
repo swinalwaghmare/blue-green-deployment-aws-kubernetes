@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-{{ .Values.deployment.slot }}
+  labels:
+    app: pingboard-frontend
+    slot: {{ .Values.deployment.slot }}
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels:
+      app: pingboard-frontend
+      slot: {{ .Values.deployment.slot}}
+  template:
+    metadata:
+      labels:
+        app: pingboard-frontend
+        slot: {{ .Values.deployment.slot }}
+    spec:
+      containers:
+        - name: frontend
+          image: {{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}
+          port:
+            - containerPort: {{ .Values.frontend.port }}
+          env:
+            - name: WS_BACKEND_URL
+              value: {{ .Values.frontend.wsBackendUrl }}

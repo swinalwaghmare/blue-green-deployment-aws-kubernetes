@@ -1,0 +1,36 @@
+apiVersion: apps/v1 
+kind: Deployment 
+metadata: 
+  name: backend-{{ .Values.deployment.slot }}
+  labels:
+    app: pingboard-backend
+    slot: {{ .Values.deployment.slot }}
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector: 
+    matchLabels: 
+      app: pingboard-backend
+      slot: {{ .Values.deployment.slot }}
+  template:
+    metadata:
+      labels:
+        app: pingboard-backend
+        slot: {{ .Values.deployment.slot }}
+    spec:
+      containers:
+        - name: backend
+          image: {{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}
+          ports:
+            - containerPort: {{ .Values.backend.port }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.backend.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe: 
+            httpGet:
+              path: /health
+              port: {{ .Values.backend.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
