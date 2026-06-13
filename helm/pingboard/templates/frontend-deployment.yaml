@@ -20,7 +20,7 @@ spec:
       containers:
         - name: frontend
           image: {{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}
-          port:
+          ports:
             - containerPort: {{ .Values.frontend.port }}
           env:
             - name: WS_BACKEND_URL
