@@ -32,7 +32,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Build Images') {
             steps {
                 sh "docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} ./backend"
@@ -56,7 +56,10 @@ pipeline {
 
         stage('Deploy to Staging') {
             when {
-                branch 'staging'
+                allOf {
+                    branch 'staging'
+                    expression {return false } // disabled untill K8s cluster ready
+                }
             }
             steps {
                 sh """
@@ -67,11 +70,15 @@ pipeline {
                         --namespace staging --create-namespace
                 """
             }
+            
         }
 
         stage('Deploy to Production') {
             when {
-                branch 'main'
+                allOf {
+                    branch 'main'
+                    expression {return false} // disable until K8s cluster ready
+                }
             }
             steps {
                 sh """
