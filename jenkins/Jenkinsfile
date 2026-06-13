@@ -56,41 +56,45 @@ pipeline {
 
         stage('Deploy to Staging') {
             when {
-                allOf {
                     branch 'staging'
-                    expression {return false } // disabled untill K8s cluster ready
                 }
-            }
             steps {
-                sh """
-                    helm upgrade --install pingboard-staging ./helm/pingboard \
-                        --set backend.image.tag=${IMAGE_TAG} \
-                        --set frontend.image.tag=${IMAGE_TAG} \
-                        --set deployment.slot=blue \
-                        --namespace staging --create-namespace
-                """
-            }
+                withCredentials([string(credentialsId: 'kubeconfig-eks', variable: 'KUBECONFIG_DATA')]) {
+                    sh '''
+                        echo "$KUBECONFIG_DATA" | base64 -d > /tmp/kubeconfig
+                        export KUBECONFIG=/tmp/kubeconfig
+                        helm upgrade --install pingboard-staging ./helm/pingboard \
+                            --set backend.image.tag=${IMAGE_TAG} \
+                            --set frontend.image.tag=${IMAGE_TAG} \
+                            --set deployment.slot=blue \
+                            --namespace staging --create-namespace
+                        rm /tmp/kubeconfig
+                    '''
+                }
             
+            }
         }
+
 
         stage('Deploy to Production') {
             when {
-                allOf {
-                    branch 'main'
-                    expression {return false} // disable until K8s cluster ready
-                }
+                branch 'main'
             }
             steps {
-                sh """
-                    helm upgrade --install pingboard-prod ./helm/pingboard \
-                        --set backend.image.tag=${IMAGE_TAG} \
-                        --set frontend.image.tag=${IMAGE_TAG} \
-                        --set deployment.slot=blue \
-                        --namespace production --create-namespace
-                """
+                withCredentials([string(credentialsId: 'kubeconfig-eks', variable: 'KUBECONFIG_DATA')]) {
+                    sh '''
+                        echo "$KUBECONFIG_DATA" | base64 -d > /tmp/kubeconfig
+                        export KUBECONFIG=/tmp/kubeconfig
+                        helm upgrade --install pingboard-prod ./helm/pingboard \
+                            --set backend.image.tag=${IMAGE_TAG} \
+                            --set frontend.image.tag=${IMAGE_TAG} \
+                            --set deployment.slot=blue \
+                            --namespace production --create-namespace
+                        rm /tmp/kubeconfig
+                    '''
+                }
             }
         }
-    }
 
     post {
         success {
@@ -100,5 +104,7 @@ pipeline {
             echo "Pipeline failed — check logs above"
         }
     }
+
+}
 
 }
