@@ -56,38 +56,56 @@ pipeline {
 
         stage('Deploy to Staging') {
             when {
-                allOf {
-                    branch 'staging'
-                    expression {return false } // disabled untill K8s cluster ready
-                }
+                branch 'staging'
             }
             steps {
-                sh """
-                    helm upgrade --install pingboard-staging ./helm/pingboard \
-                        --set backend.image.tag=${IMAGE_TAG} \
-                        --set frontend.image.tag=${IMAGE_TAG} \
-                        --set deployment.slot=blue \
-                        --namespace staging --create-namespace
-                """
+                withCredentials([
+                    string(credentialsId: 'kubeconfig-eks', variable: 'KUBECONFIG_DATA'),
+                    string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    sh '''
+                        echo "$KUBECONFIG_DATA" | base64 -d > /tmp/kubeconfig
+                        export KUBECONFIG=/tmp/kubeconfig
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        export AWS_DEFAULT_REGION=us-east-1
+                        helm upgrade --install pingboard-staging ./helm/pingboard \
+                            --set backend.image.tag=${IMAGE_TAG} \
+                            --set frontend.image.tag=${IMAGE_TAG} \
+                            --set deployment.slot=blue \
+                            --namespace staging --create-namespace
+                        rm /tmp/kubeconfig
+                    '''
+                }
             }
-            
         }
+
 
         stage('Deploy to Production') {
             when {
-                allOf {
-                    branch 'main'
-                    expression {return false} // disable until K8s cluster ready
-                }
+                branch 'main'
             }
             steps {
-                sh """
-                    helm upgrade --install pingboard-prod ./helm/pingboard \
-                        --set backend.image.tag=${IMAGE_TAG} \
-                        --set frontend.image.tag=${IMAGE_TAG} \
-                        --set deployment.slot=blue \
-                        --namespace production --create-namespace
-                """
+                withCredentials([
+                    string(credentialsId: 'kubeconfig-eks', variable: 'KUBECONFIG_DATA'),
+                    string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
+                    sh '''
+                        echo "$KUBECONFIG_DATA" | base64 -d > /tmp/kubeconfig
+                        export KUBECONFIG=/tmp/kubeconfig
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        export AWS_DEFAULT_REGION=us-east-1
+                        helm upgrade --install pingboard-staging ./helm/pingboard \
+                            --set backend.image.tag=${IMAGE_TAG} \
+                            --set frontend.image.tag=${IMAGE_TAG} \
+                            --set deployment.slot=blue \
+                            --namespace production --create-namespace
+                        rm /tmp/kubeconfig
+                    '''
+                }
             }
         }
     }
