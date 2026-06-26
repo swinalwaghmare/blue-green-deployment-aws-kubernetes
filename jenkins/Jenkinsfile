@@ -56,13 +56,20 @@ pipeline {
 
         stage('Deploy to Staging') {
             when {
-                    branch 'staging'
-                }
+                branch 'staging'
+            }
             steps {
-                withCredentials([string(credentialsId: 'kubeconfig-eks', variable: 'KUBECONFIG_DATA')]) {
+                withCredentials([
+                    string(credentialsId: 'kubeconfig-eks', variable: 'KUBECONFIG_DATA'),
+                    string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
                     sh '''
                         echo "$KUBECONFIG_DATA" | base64 -d > /tmp/kubeconfig
                         export KUBECONFIG=/tmp/kubeconfig
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        export AWS_DEFAULT_REGION=us-east-1
                         helm upgrade --install pingboard-staging ./helm/pingboard \
                             --set backend.image.tag=${IMAGE_TAG} \
                             --set frontend.image.tag=${IMAGE_TAG} \
@@ -71,7 +78,6 @@ pipeline {
                         rm /tmp/kubeconfig
                     '''
                 }
-            
             }
         }
 
@@ -81,11 +87,18 @@ pipeline {
                 branch 'main'
             }
             steps {
-                withCredentials([string(credentialsId: 'kubeconfig-eks', variable: 'KUBECONFIG_DATA')]) {
+                withCredentials([
+                    string(credentialsId: 'kubeconfig-eks', variable: 'KUBECONFIG_DATA'),
+                    string(credentialsId: 'aws-access-key-id', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY')
+                ]) {
                     sh '''
                         echo "$KUBECONFIG_DATA" | base64 -d > /tmp/kubeconfig
                         export KUBECONFIG=/tmp/kubeconfig
-                        helm upgrade --install pingboard-prod ./helm/pingboard \
+                        export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                        export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                        export AWS_DEFAULT_REGION=us-east-1
+                        helm upgrade --install pingboard-staging ./helm/pingboard \
                             --set backend.image.tag=${IMAGE_TAG} \
                             --set frontend.image.tag=${IMAGE_TAG} \
                             --set deployment.slot=blue \
